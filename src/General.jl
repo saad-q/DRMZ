@@ -190,27 +190,6 @@ function reduced_initial_condition(L1,L2,x_reduced,x_locations,initial_condition
     return ic_reduced
 end
 
-"""
-    fourier_diff(sol,N,dL;format="matrix")
-
-Compute the derivative using a Fourier differentiation matrix (default) or the spectral derivative for periodic functions for domain length `dL` and with `N` discretization points.
-
-"""
-function fourier_diff(sol,N,dL;format="matrix")
-    if format == "matrix"
-        h = 2*pi/N;
-        col = vcat(0, 0.5*(-1).^(1:N-1).*cot.((1:N-1)*h/2));
-        row = vcat(col[1], col[N:-1:2]);
-        diff_matrix = Toeplitz(col,row);
-        diff_sol = (2*pi/dL)*diff_matrix*sol; # Make dx calc abs...
-    elseif format == "spectral"
-        k = reduce(vcat,(2*π/dL)*[0:N/2-1 -N/2:-1]); # Wavenumbers
-        sol_k = fft(sol);
-        sol_k[Int(N/2)+1] = 0;
-        diff_sol = real.(ifft(im*k.*sol_k));
-    end
-    return diff_sol
-end
 
 """
     trapz(x_range,integrand)
