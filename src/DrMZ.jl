@@ -15,7 +15,6 @@ using Interpolations
 using BSON: @save
 using BSON: @load
 using Printf
-using ToeplitzMatrices
 using Statistics: mean, std
 using FastGaussQuadrature
 using ForwardDiff
@@ -25,7 +24,6 @@ using LegendrePolynomials
 export error_se, error_rel, mse_error, norm_rel_error, norm_rel_error_continuous, norm_infinity_error, ic_error, average_ic_error, average_error,
        periodic_fill_domain, periodic_fill_solution, solution_interpolation, reduced_initial_condition, solution_spatial_sampling, solution_temporal_sampling,
        fft_norm, ifft_norm,
-       fourier_diff,
        trapz,
        gauss_legendre,
        clenshaw_curtis, cheby_grid, cheby_diff_matrix, cheby_diff,
