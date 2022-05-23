@@ -769,12 +769,6 @@ git-tree-sha1 = "7cb456f358e8f9d102a8b25e8dfedf58fa5689bc"
 uuid = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 version = "0.5.13"
 
-[[ToeplitzMatrices]]
-deps = ["AbstractFFTs", "FFTW", "LinearAlgebra", "StatsBase"]
-git-tree-sha1 = "39731ea29652305b1eeb7ab0d1085533db307191"
-uuid = "c751599d-da0a-543b-9d20-d0a503d91d24"
-version = "0.6.3"
-
 [[TranscodingStreams]]
 deps = ["Random", "Test"]
 git-tree-sha1 = "216b95ea110b5972db65aa90f88d8d89dcb8851c"
