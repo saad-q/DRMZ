@@ -150,12 +150,12 @@ function solution_extraction(x_locations,t_values,solution,initial_condition,num
 end
 
 """
-    generate_periodic_train_test_initial_conditions(t_span,number_sensors,number_test_functions,number_train_functions,number_solution_points,pde_function_handle;L1=0,L2=2*pi,length_scale=0.5,batch=number_solution_points,dt=1e-3,nu_val=0.1,domain="periodic",fnc=(x)->sin(x/2)^2)
+    generate_periodic_train_test_initial_conditions(L1,L2,number_sensors,number_test_functions,number_train_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt=1e-3,nu_val=0.1,domain="periodic",fnc=(x)->sin(x/2)^2)
 
 Generate the training and testing data for a specified `pde_function_handle` for periodic boundary conditions using a Fourier spectral method. Defaults to IC \$f(\\sin^2(x/2))\$ and \$x ∈ [0,1]\$.
 
 """
-function generate_periodic_train_test_initial_conditions(number_sensors,number_train_functions,number_test_functions;L1=0,L2=2*pi,length_scale=0.5,domain="periodic",fnc=(x)->sin(x/2)^2)
+function generate_periodic_train_test_initial_conditions(L1,L2,number_sensors,number_train_functions,number_test_functions;length_scale=0.5,domain="periodic",fnc=(x)->sin(x/2)^2)
 
     if domain == "periodic"
         x_full = range(L1,stop = L2,length = number_sensors+1); # Full domain for periodic number of sensors
@@ -172,12 +172,12 @@ function generate_periodic_train_test_initial_conditions(number_sensors,number_t
 end
 
 """
-    generate_periodic_train_test(t_span,number_sensors,number_test_functions,number_train_functions,number_solution_points,pde_function_handle;L1=0,L2=2*pi,length_scale=0.5,batch=number_solution_points,dt=1e-3,nu_val=0.1,domain="periodic",fnc=(x)->sin(x/2)^2)
+    generate_periodic_train_test(L1,L2,t_span,number_sensors,number_test_functions,number_train_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt=1e-3,nu_val=0.1,domain="periodic",fnc=(x)->sin(x/2)^2)
 
 Generate the training and testing data for a specified `pde_function_handle` for periodic boundary conditions using a Fourier spectral method. Defaults to IC \$f(\\sin^2(x/2))\$ and \$x ∈ [0,1]\$.
 
 """
-function generate_periodic_train_test(t_span,number_sensors,number_train_functions,number_test_functions,number_solution_points,pde_function_handle;L1=0,L2=2*pi,length_scale=0.5,batch=number_solution_points,dt_size=1e-3,nu_val=0.1,domain="periodic",fnc=(x)->sin(x/2)^2)
+function generate_periodic_train_test(L1,L2,t_span,number_sensors,number_train_functions,number_test_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt_size=1e-3,nu_val=0.1,domain="periodic",fnc=(x)->sin(x/2)^2)
 
     if domain == "periodic"
         x_full = range(L1,stop = L2,length = number_sensors+1); # Full domain for periodic number of sensors
@@ -192,7 +192,7 @@ function generate_periodic_train_test(t_span,number_sensors,number_train_functio
         dL = abs(L2-L1);
         # Set up x domain and wave vector for spectral solution
         x = trapezoid((number_sensors-1),L1,L2)[1];
-        k = reduce(vcat,(2*π/dL)*[0:Int(number_sensors-1)/2-1 -Int(number_sensors-1)/2:-1]);
+        k = reduce(vcat,(2*pi/dL)*[0:Int(number_sensors-1)/2-1 -Int(number_sensors-1)/2:-1]);
     end
 
     # Generate the dataset using spectral method
@@ -248,12 +248,12 @@ function generate_periodic_train_test(t_span,number_sensors,number_train_functio
 end
 
 """
-    generate_periodic_train_test_muscl(t_span,number_sensors,number_test_functions,number_train_functions,number_solution_points,pde_function_handle;L1=0,L2=2*pi,length_scale=0.5,batch=number_solution_points,dt_size=1e-4,upwind_solution_points=4096,fnc=(x)->sin(x/2)^2)
+    generate_periodic_train_test_muscl(L1,L2,t_span,number_sensors,number_test_functions,number_train_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt_size=1e-4,upwind_solution_points=4096,fnc=(x)->sin(x/2)^2)
 
 Generate the training and testing data for a specified `pde_function_handle` for periodic boundary conditions using a MUSCL method. Defaults to IC \$f(\\sin^2(x/2))\$ and \$x ∈ [0,1]\$.
 
 """
-function generate_periodic_train_test_muscl(t_span,number_sensors,number_train_functions,number_test_functions,number_solution_points,pde_function_handle;L1=0,L2=2*pi,length_scale=0.5,batch=number_solution_points,dt_size=1e-4,upwind_solution_points=4096,fnc=(x)->sin(x/2)^2)
+function generate_periodic_train_test_muscl(L1,L2,t_span,number_sensors,number_train_functions,number_test_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt_size=1e-4,upwind_solution_points=4096,fnc=(x)->sin(x/2)^2)
 
     x_full = range(L1,stop = L2,length = upwind_solution_points+1); # Full domain
     random_ics = generate_periodic_functions(fnc,x_full,Int(number_train_functions + number_test_functions),length_scale)
@@ -305,12 +305,12 @@ function generate_periodic_train_test_muscl(t_span,number_sensors,number_train_f
 end
 
 """
-    generate_periodic_train_test_esdirk(t_span,number_sensors,number_train_functions,number_test_functions,number_solution_points,pde_function_handle;L1=0,L2=2*pi,length_scale=0.5,batch=number_solution_points,dt_size=1e-4,nu_val=0.1,domain="periodic",fnc=(x)->sin(x/2)^2,mode_multiplier=4)
+    generate_periodic_train_test_esdirk(L1,L2,t_span,number_sensors,number_train_functions,number_test_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt_size=1e-4,nu_val=0.1,domain="periodic",fnc=(x)->sin(x/2)^2,mode_multiplier=4)
 
 Generate the training and testing data for a specified `pde_function_handle` for periodic boundary conditions using a Fourier spectral method and a ESDIRK ODE solver. Defaults to IC \$f(\\sin^2(x/2))\$ and \$x ∈ [0,1]\$.
 
 """
-function generate_periodic_train_test_esdirk(t_span,number_sensors,number_train_functions,number_test_functions,number_solution_points,pde_function_handle;L1=0,L2=2*pi,length_scale=0.5,batch=number_solution_points,dt_size=1e-4,nu_val=0.1,domain="periodic",fnc=(x)->sin(x/2)^2,mode_multiplier=4)
+function generate_periodic_train_test_esdirk(L1,L2,t_span,number_sensors,number_train_functions,number_test_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt_size=1e-4,nu_val=0.1,domain="periodic",fnc=(x)->sin(x/2)^2,mode_multiplier=4)
 
     x_full = range(L1,stop = L2,length = Int(mode_multiplier*number_sensors+1)); # Full domain for periodic number of sensors
     random_ics = generate_periodic_functions(fnc,x_full,Int(number_train_functions + number_test_functions),length_scale)
@@ -359,12 +359,12 @@ function generate_periodic_train_test_esdirk(t_span,number_sensors,number_train_
 end
 
 """
-    generate_periodic_train_test_implicit(t_span,number_sensors,number_train_functions,number_test_functions,number_solution_points,pde_function_handle;L1=0,L2=2*pi,length_scale=0.5,batch=number_solution_points,dt_size=1e-4,nu_val=0.1,domain="periodic",fnc=(x)->sin(x/2)^2,mode_multiplier=4)
+    generate_periodic_train_test_implicit(L1,L2,t_span,number_sensors,number_train_functions,number_test_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt_size=1e-4,nu_val=0.1,domain="periodic",fnc=(x)->sin(x/2)^2,mode_multiplier=4)
 
 Generate the training and testing data for a specified `pde_function_handle` for periodic boundary conditions using a Fourier spectral method and a Crank-Nicolson solver. Defaults to IC \$f(\\sin^2(x/2))\$ and \$x ∈ [0,1]\$.
 
 """
-function generate_periodic_train_test_implicit(t_span,number_sensors,number_train_functions,number_test_functions,number_solution_points,pde_function_handle;L1=0,L2=2*pi,length_scale=0.5,batch=number_solution_points,dt_size=1e-4,nu_val=0.1,domain="periodic",fnc=(x)->sin(x/2)^2,mode_multiplier=4)
+function generate_periodic_train_test_implicit(L1,L2,t_span,number_sensors,number_train_functions,number_test_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt_size=1e-4,nu_val=0.1,domain="periodic",fnc=(x)->sin(x/2)^2,mode_multiplier=4)
 
     x_full = range(L1,stop = L2,length = Int(mode_multiplier*number_sensors+1)); # Full domain for periodic number of sensors
     random_ics = generate_periodic_functions(fnc,x_full,Int(number_train_functions + number_test_functions),length_scale)
