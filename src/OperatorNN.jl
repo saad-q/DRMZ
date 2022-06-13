@@ -172,12 +172,15 @@ function generate_periodic_train_test_initial_conditions(L1,L2,number_sensors,nu
 end
 
 """
-    generate_periodic_train_test(L1,L2,t_span,number_sensors,number_test_functions,number_train_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt=1e-3,nu_val=0.1,domain="periodic",fnc=(x)->sin(x/2)^2)
+    generate_periodic_train_test(L1,L2,t_span,number_sensors,number_test_functions,number_train_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt=1e-3,nu_val=0.1,domain="periodic")
 
 Generate the training and testing data for a specified `pde_function_handle` for periodic boundary conditions using a Fourier spectral method. Defaults to IC \$f(\\sin^2(x/2))\$ and \$x ∈ [0,1]\$.
 
 """
-function generate_periodic_train_test(L1,L2,t_span,number_sensors,number_train_functions,number_test_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt_size=1e-3,nu_val=0.1,domain="periodic",fnc=(x)->sin(x/2)^2)
+function generate_periodic_train_test(L1,L2,t_span,number_sensors,number_train_functions,number_test_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt_size=1e-3,nu_val=0.1,domain="periodic")
+
+    dL = abs(L2-L1);
+    fnc = (x)->sin(pi*x/dL)^2;
 
     if domain == "periodic"
         x_full = range(L1,stop = L2,length = number_sensors+1); # Full domain for periodic number of sensors
@@ -186,6 +189,7 @@ function generate_periodic_train_test(L1,L2,t_span,number_sensors,number_train_f
         # Set up x domain and wave vector for spectral solution
         x = trapezoid(number_sensors,L1,L2)[1];
         k = reduce(vcat,(2*π/dL)*[0:number_sensors/2-1 -number_sensors/2:-1]);
+
     elseif domain == "full"
         x_full = range(L1,stop = L2,length = number_sensors); # Full domain for periodic number of sensors
         random_ics = generate_periodic_functions(fnc,x_full,Int(number_train_functions + number_test_functions),length_scale)
