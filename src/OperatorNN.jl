@@ -1,8 +1,6 @@
 """
     predict(branch,trunk,initial_condition,x_locations,t_values)
-
 Predict solution ``u(t,x)`` at specified output locations using trained operator neural network `branch` and `trunk`.
-
 """
 function predict(branch,trunk,initial_condition,x_locations,t_values)
     u = zeros(size(t_values,1),size(x_locations,1));
@@ -18,9 +16,7 @@ end
 
 """
     loss_all(branch,trunk,initial_conditon,solution_location,target_value)
-
 Compute the mean squared error (MSE) for a complete dataset.
-
 """
 function loss_all(branch,trunk,initial_condition,solution_location,target_value)
     yhat = zeros(1,size(target_value,2));
@@ -32,15 +28,12 @@ end
 
 """
     function build_dense_model(number_layers,neurons,activations)
-
 Build a feedforward neural network (FFNN) consisting of `number_layers` of Flux dense layers for the specified number of `neurons` and `activations`.
-
 # Examples
 ```julia-repl
 julia> build_dense_model(2,[(128,128),(128,128)],[relu,relu])
 Chain(Dense(128, 128, NNlib.relu), Dense(128, 128, NNlib.relu))
 ```
-
 """
 function build_dense_model(number_layers,neurons,activations)
     layers = [Dense(neurons[i][1],neurons[i][2],activations[i]) for i in 1:number_layers];
@@ -49,9 +42,7 @@ end
 
 """
     train_model(branch,trunk,n_epoch,train_data;learning_rate=0.00001,save_at=2500,starting_epoch=0)
-
 Train the operator neural network using the mean squared error (MSE) and Adam optimization for `n_epochs` epochs.
-
 """
 function train_model(branch,trunk,n_epoch,train_data,test_data,pde_function;learning_rate=1e-5,save_at=2500,starting_epoch=0)
     loss(x,y,z) = Flux.mse(branch(x)'*trunk(y),z)
@@ -72,9 +63,7 @@ end
 
 """
     function exp_kernel_periodic(fnc,x_locations;length_scale=0.5)
-
 Covariance kernel for radial basis function (GRF) and IC function for domain.
-
 """
 function exp_kernel_periodic(fnc,x_locations,length_scale)
     out = zeros(size(x_locations,1),size(x_locations,1));
@@ -84,9 +73,7 @@ end
 
 """
     generate_periodic_functions(fnc,x_locations,number_functions,length_scale)
-
 Generate a specified `number_functions` of random periodic vectors using the `exp_kernel_periodic` function and a multivariate distribution.
-
 """
 function generate_periodic_functions(fnc,x_locations,number_functions,length_scale)
     sigma = exp_kernel_periodic(fnc,x_locations,length_scale); # Covariance
@@ -100,9 +87,7 @@ end
 
 """
     generate_sinusoidal_functions_2_parameter(x_locations,number_functions)
-
 Generate a specified `number_functions` of random periodic vectors for the distribution \$α \\sin(x)+β\$ for ``α ∈ [-1,1]`` and ``β ∈ [-1,1]``.
-
 """
 function generate_sinusoidal_functions_2_parameter(x_locations,number_functions)
     values = rand(-1.0:(2.0/(number_functions*10)):1.0,(number_functions,2)); # alpha, beta parameters
@@ -119,9 +104,7 @@ end
 
 """
     solution_extraction(x_locations,t_values,solution,initial_condition,number_solution_points)
-
 Extract the specified `number_solution_points` randomly from the ``u(t,x)`` solution space.
-
 """
 function solution_extraction(x_locations,t_values,solution,initial_condition,number_solution_points)
     if number_solution_points >= size(solution,1)*size(solution,2)
@@ -151,9 +134,7 @@ end
 
 """
     generate_periodic_train_test_initial_conditions(L1,L2,number_sensors,number_test_functions,number_train_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt=1e-3,nu_val=0.1,domain="periodic",fnc=(x)->sin(x/2)^2)
-
 Generate the training and testing data for a specified `pde_function_handle` for periodic boundary conditions using a Fourier spectral method. Defaults to IC \$f(\\sin^2(x/2))\$ and \$x ∈ [0,1]\$.
-
 """
 function generate_periodic_train_test_initial_conditions(L1,L2,number_sensors,number_train_functions,number_test_functions;length_scale=0.5,domain="periodic",fnc=(x)->sin(x/2)^2)
 
@@ -173,9 +154,7 @@ end
 
 """
     generate_periodic_train_test(L1,L2,t_span,number_sensors,number_test_functions,number_train_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt=1e-3,nu_val=0.1,domain="periodic")
-
 Generate the training and testing data for a specified `pde_function_handle` for periodic boundary conditions using a Fourier spectral method. Defaults to IC \$f(\\sin^2(x/2))\$ and \$x ∈ [0,1]\$.
-
 """
 function generate_periodic_train_test(L1,L2,t_span,number_sensors,number_train_functions,number_test_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt_size=1e-3,nu_val=0.1,domain="periodic")
 
@@ -251,11 +230,111 @@ function generate_periodic_train_test(L1,L2,t_span,number_sensors,number_train_f
     return train_data, test_data
 end
 
+
+"""
+    generate_periodic_train_test_Adv2D(L_x,L_y,M_x,M_y,t_span,alp,number_sensors,number_test_functions,number_train_functions,number_solution_points;batch=number_solution_points,dt=1e-3)
+
+Generate the training and testing data for 2D advection with periodic boundary conditions
+
+"""
+
+function generate_periodic_train_test_Adv2D(L_x,L_y,M_x,M_y,t_span,alp,number_sensors,number_train_functions,number_test_functions,number_solution_points;batch=number_solution_points,dt_size=1e-3)
+
+ # Generate the dataset using exact solution to the advection problem
+    t_length = Int(t_span[2]/dt_size + 1);
+    t_values = range(t_span[1],stop = t_span[2], length = t_length);
+    
+    train_ic = zeros(number_sensors,number_solution_points,number_train_functions);
+    train_loc = zeros(3,number_solution_points,number_train_functions);
+    train_target = zeros(1,number_solution_points,number_train_functions);
+    
+    test_ic = zeros(number_sensors,number_solution_points,number_test_functions);
+    test_loc = zeros(3,number_solution_points,number_test_functions);
+    test_target = zeros(1,number_solution_points,number_test_functions);
+
+    number_sensors_sq = Int(sqrt(number_sensors));
+
+    dL_x = abs(L_x[2]-L_x[1]);
+    dL_y = abs(L_y[2]-L_y[1]);
+
+    x_eq = range(L_x[1],stop = L_x[2],length = number_sensors_sq + 1); x_eq = x_eq[1:end-1];
+    y_eq = range(L_y[1],stop = L_y[2],length = number_sensors_sq + 1); y_eq = y_eq[1:end-1];
+
+    xy_eq = zeros(number_sensors,2);
+    for j = 1:number_sensors_sq 
+	xy_eq[(j-1)*number_sensors_sq+1:j*number_sensors_sq,:] = hcat(repeat([x_eq[j]],number_sensors_sq,1),y_eq);
+    end
+
+    t_x_grid = zeros(number_sensors*t_length,3);
+    for i = 1:t_length
+	t_x_grid[(i-1)*number_sensors+1:i*number_sensors,:] = hcat(repeat([t_values[i]],number_sensors,1), xy_eq);
+    end
+
+	
+    @showprogress 1 "Building training and testing datasets..." for l = 1:(number_train_functions + number_test_functions)
+    	
+	C_x = 2*rand(2*M_x+1,1) .- 1;
+	C_y = 2*rand(2*M_y+1,1) .- 1;
+
+	u0x(x) = C_x[1] .+ sum(cos.(2*pi*(x-L_x[1]).*(1:M_x)'/dL_x).*C_x[2:M_x+1]') + sum(sin.(2*pi*(x-L_x[1]).*(1:M_x)'/dL_x).*C_x[M_x+2:2*M_x+1]');
+	u0y(y) = C_y[1] .+ sum(cos.(2*pi*(y-L_y[1]).*(1:M_y)'/dL_y).*C_y[2:M_y+1]') + sum(sin.(2*pi*(y-L_y[1]).*(1:M_y)'/dL_y).*C_y[M_y+2:2*M_y+1]');
+
+	u0(x,y) = u0x.(x).*u0y.(y);
+	u(txy) = u0x.(mod.(txy[2]-alp[1]*txy[1]+L_x[1],dL_x) .+ L_x[1]).*u0y.(mod.(txy[3]-alp[2]*txy[1]+L_y[1],dL_y) .+ L_y[1]);
+	
+	u0vals = u0(xy_eq[:,1],xy_eq[:,2]);
+
+	
+	shuffled_indices = randperm(number_sensors*t_length);
+	indices = shuffled_indices[1:number_solution_points];
+	# print("halooo\n")
+
+	sol_location = t_x_grid[indices,:];
+        sol_vals = zeros(number_solution_points,1);
+	for jj = 1:number_solution_points
+		sol_vals[jj] = u(sol_location[jj,:]);
+	end  
+
+	if l <= number_train_functions
+		for jj = 1:number_solution_points
+			train_ic[:,jj,l] = u0vals; 
+		end
+
+   		train_loc[:,:,l] = sol_location'; 
+   		train_target[:,:,l] = sol_vals';
+
+	else
+		for jj = 1:number_solution_points
+			test_ic[:,jj,l-number_train_functions] = u0vals; 
+		end
+
+   		test_loc[:,:,l-number_train_functions] = sol_location'; 
+   		test_target[:,:,l-number_train_functions] = sol_vals';
+	end
+    end
+
+ 
+    # Combine data sets from each function
+    opnn_train_ic = reshape(hcat(train_ic...),(number_sensors,Int(number_solution_points*number_train_functions)));
+    opnn_train_loc = reshape(hcat(train_loc...),(3,Int(number_solution_points*number_train_functions)));
+    opnn_train_target = reshape(hcat(train_target...),(1,Int(number_solution_points*number_train_functions)));
+    opnn_test_ic = reshape(hcat(test_ic...),(number_sensors,Int(number_solution_points*number_test_functions)));
+    opnn_test_loc = reshape(hcat(test_loc...),(3,Int(number_solution_points*number_test_functions)));
+    opnn_test_target = reshape(hcat(test_target...),(1,Int(number_solution_points*number_test_functions)));
+
+    train_data = DataLoader(opnn_train_ic, opnn_train_loc, opnn_train_target, batchsize=batch);
+    test_data = DataLoader(opnn_test_ic, opnn_test_loc, opnn_test_target, batchsize=batch);
+
+    return train_data, test_data
+
+
+end
+
+
+
 """
     generate_periodic_train_test_muscl(L1,L2,t_span,number_sensors,number_test_functions,number_train_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt_size=1e-4,upwind_solution_points=4096,fnc=(x)->sin(x/2)^2)
-
 Generate the training and testing data for a specified `pde_function_handle` for periodic boundary conditions using a MUSCL method. Defaults to IC \$f(\\sin^2(x/2))\$ and \$x ∈ [0,1]\$.
-
 """
 function generate_periodic_train_test_muscl(L1,L2,t_span,number_sensors,number_train_functions,number_test_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt_size=1e-4,upwind_solution_points=4096,fnc=(x)->sin(x/2)^2)
 
@@ -310,9 +389,7 @@ end
 
 """
     generate_periodic_train_test_esdirk(L1,L2,t_span,number_sensors,number_train_functions,number_test_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt_size=1e-4,nu_val=0.1,domain="periodic",fnc=(x)->sin(x/2)^2,mode_multiplier=4)
-
 Generate the training and testing data for a specified `pde_function_handle` for periodic boundary conditions using a Fourier spectral method and a ESDIRK ODE solver. Defaults to IC \$f(\\sin^2(x/2))\$ and \$x ∈ [0,1]\$.
-
 """
 function generate_periodic_train_test_esdirk(L1,L2,t_span,number_sensors,number_train_functions,number_test_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt_size=1e-4,nu_val=0.1,domain="periodic",fnc=(x)->sin(x/2)^2,mode_multiplier=4)
 
@@ -364,9 +441,7 @@ end
 
 """
     generate_periodic_train_test_implicit(L1,L2,t_span,number_sensors,number_train_functions,number_test_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt_size=1e-4,nu_val=0.1,domain="periodic",fnc=(x)->sin(x/2)^2,mode_multiplier=4)
-
 Generate the training and testing data for a specified `pde_function_handle` for periodic boundary conditions using a Fourier spectral method and a Crank-Nicolson solver. Defaults to IC \$f(\\sin^2(x/2))\$ and \$x ∈ [0,1]\$.
-
 """
 function generate_periodic_train_test_implicit(L1,L2,t_span,number_sensors,number_train_functions,number_test_functions,number_solution_points,pde_function_handle;length_scale=0.5,batch=number_solution_points,dt_size=1e-4,nu_val=0.1,domain="periodic",fnc=(x)->sin(x/2)^2,mode_multiplier=4)
 
@@ -418,9 +493,7 @@ end
 
 """
     save_model(branch,trunk,n_epoch,loss_all_train,loss_all_test,pde_function)
-
 Save the trained `branch` and `trunk` neural networks and the training and testing loss history.
-
 """
 function save_model(branch,trunk,n_epoch,pde_function)
     @save @sprintf("branch_epochs_%i_%s.bson",n_epoch,pde_function) branch
@@ -429,9 +502,7 @@ end
 
 """
     load_model(n_epoch,pde_function)
-
 Load the trained `branch` and `trunk` neural networks.
-
 """
 function load_model(n_epoch,pde_function)
     @load @sprintf("branch_epochs_%i_%s.bson",n_epoch,pde_function) branch
@@ -441,9 +512,7 @@ end
 
 """
     load_branch(n_epoch,pde_function)
-
 Load the trained `branch` neural networks.
-
 """
 function load_branch(n_epoch,pde_function)
     @load @sprintf("branch_epochs_%i_%s.bson",n_epoch,pde_function) branch
@@ -452,9 +521,7 @@ end
 
 """
     load_trunk(n_epoch,pde_function)
-
 Load the trained `trunk` neural networks.
-
 """
 function load_trunk(n_epoch,pde_function)
     @load @sprintf("trunk_epochs_%i_%s.bson",n_epoch,pde_function) trunk
@@ -463,9 +530,7 @@ end
 
 """
     save_data(train_data,test_data,number_train_functions,number_test_functions,number_solution_points,pde_function)
-
 Save the `train_data` and `test_data`.
-
 """
 function save_data(train_data,test_data,number_train_functions,number_test_functions,number_solution_points,pde_function)
     train_ic = train_data.data[1];
@@ -484,9 +549,7 @@ end
 
 """
     load_data(n_epoch,number_train_functions,number_test_functions,pde_function)
-
 Load the trained `branch` and `trunk` neural networks along with the `train_data` and `test_data`.
-
 """
 function load_data(n_epoch,number_train_functions,number_test_functions,pde_function)
     @load @sprintf("branch_epochs_%i_%s.bson",n_epoch,pde_function) branch
@@ -502,9 +565,7 @@ end
 
 """
     load_data_train_test(number_train_functions,number_test_functions,pde_function)
-
 Load the `train_data` and `test_data`.
-
 """
 function load_data_train_test(number_train_functions,number_test_functions,pde_function)
     @load @sprintf("train_ic_data_%i_%s.bson",number_train_functions,pde_function) train_ic
@@ -518,9 +579,7 @@ end
 
 """
     load_data_initial_conditions(number_train_functions,number_test_functions,pde_function)
-
 Load the initial conditions from the `train_data` and `test_data`.
-
 """
 function load_data_initial_conditions(number_train_functions,number_test_functions,pde_function)
     @load @sprintf("train_ic_data_%i_%s.bson",number_train_functions,pde_function) train_ic
@@ -530,9 +589,7 @@ end
 
 """
     save_data_initial_conditions(number_train_functions,number_test_functions)
-
 Saves the initial conditions from the `train_ic` and `test_ic`.
-
 """
 function save_data_initial_conditions(train_ic,test_ic,number_train_functions,number_test_functions,pde_function)
     @save @sprintf("train_ic_data_%i_%s.bson",number_train_functions,pde_function) train_ic
