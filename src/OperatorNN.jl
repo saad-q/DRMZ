@@ -232,15 +232,17 @@ end
 
 
 """
-    generate_periodic_train_test_Adv2D(L_x,L_y,M_x,M_y,t_span,alp,number_sensors,number_test_functions,number_train_functions,number_solution_points;batch=number_solution_points,dt=1e-3)
+    generate_periodic_train_test_Adv2D(L_x,L_y,M_x,M_y,t_span,alp,number_sensors_x,number_sensors_y,number_test_functions,number_train_functions,number_solution_points;batch=number_solution_points,dt=1e-3)
 
 Generate the training and testing data for 2D advection with periodic boundary conditions
 
 """
 
-function generate_periodic_train_test_Adv2D(L_x,L_y,M_x,M_y,t_span,alp,number_sensors,number_train_functions,number_test_functions,number_solution_points;batch=number_solution_points,dt_size=1e-3)
+function generate_periodic_train_test_Adv2D(L_x,L_y,M_x,M_y,t_span,alp,number_sensors_x,number_sensors_y,number_train_functions,number_test_functions,number_solution_points;batch=number_solution_points,dt_size=1e-3)
 
- # Generate the dataset using exact solution to the advection problem
+    number_sensors = Int(number_sensors_x*number_sensors_y);
+
+    # Generate the dataset using exact solution to the advection problem
     t_length = Int(t_span[2]/dt_size + 1);
     t_values = range(t_span[1],stop = t_span[2], length = t_length);
     
@@ -252,17 +254,23 @@ function generate_periodic_train_test_Adv2D(L_x,L_y,M_x,M_y,t_span,alp,number_se
     test_loc = zeros(3,number_solution_points,number_test_functions);
     test_target = zeros(1,number_solution_points,number_test_functions);
 
-    number_sensors_sq = Int(sqrt(number_sensors));
-
+    
     dL_x = abs(L_x[2]-L_x[1]);
-    dL_y = abs(L_y[2]-L_y[1]);
+    if abs(dL_x) < 1.0e-12
+	dL_x = 1.0;
+    end
 
-    x_eq = range(L_x[1],stop = L_x[2],length = number_sensors_sq + 1); x_eq = x_eq[1:end-1];
-    y_eq = range(L_y[1],stop = L_y[2],length = number_sensors_sq + 1); y_eq = y_eq[1:end-1];
+    dL_y = abs(L_y[2]-L_y[1]);
+    if abs(dL_y) < 1.0e-12
+	dL_y = 1.0;
+    end
+
+    x_eq = range(L_x[1],stop = L_x[2],length = number_sensors_x + 1); x_eq = x_eq[1:end-1];
+    y_eq = range(L_y[1],stop = L_y[2],length = number_sensors_y + 1); y_eq = y_eq[1:end-1];
 
     xy_eq = zeros(number_sensors,2);
-    for j = 1:number_sensors_sq 
-	xy_eq[(j-1)*number_sensors_sq+1:j*number_sensors_sq,:] = hcat(repeat([x_eq[j]],number_sensors_sq,1),y_eq);
+    for j = 1:number_sensors_x 
+	xy_eq[(j-1)*number_sensors_y+1:j*number_sensors_y,:] = hcat(repeat([x_eq[j]],number_sensors_y,1),y_eq);
     end
 
     t_x_grid = zeros(number_sensors*t_length,3);
@@ -276,8 +284,8 @@ function generate_periodic_train_test_Adv2D(L_x,L_y,M_x,M_y,t_span,alp,number_se
 	C_x = 2*rand(2*M_x+1,1) .- 1;
 	C_y = 2*rand(2*M_y+1,1) .- 1;
 
-	u0x(x) = C_x[1] .+ sum(cos.(2*pi*(x-L_x[1]).*(1:M_x)'/dL_x).*C_x[2:M_x+1]') + sum(sin.(2*pi*(x-L_x[1]).*(1:M_x)'/dL_x).*C_x[M_x+2:2*M_x+1]');
-	u0y(y) = C_y[1] .+ sum(cos.(2*pi*(y-L_y[1]).*(1:M_y)'/dL_y).*C_y[2:M_y+1]') + sum(sin.(2*pi*(y-L_y[1]).*(1:M_y)'/dL_y).*C_y[M_y+2:2*M_y+1]');
+	u0x(x) = C_x[1] .+ sum(cos.(2*pi*(x-L_x[1]).*(1:M_x)'/dL_x).*C_x[2:M_x+1]') .+ sum(sin.(2*pi*(x-L_x[1]).*(1:M_x)'/dL_x).*C_x[M_x+2:2*M_x+1]');
+	u0y(y) = C_y[1] .+ sum(cos.(2*pi*(y-L_y[1]).*(1:M_y)'/dL_y).*C_y[2:M_y+1]') .+ sum(sin.(2*pi*(y-L_y[1]).*(1:M_y)'/dL_y).*C_y[M_y+2:2*M_y+1]');
 
 	u0(x,y) = u0x.(x).*u0y.(y);
 	u(txy) = u0x.(mod.(txy[2]-alp[1]*txy[1]+L_x[1],dL_x) .+ L_x[1]).*u0y.(mod.(txy[3]-alp[2]*txy[1]+L_y[1],dL_y) .+ L_y[1]);
@@ -318,6 +326,7 @@ function generate_periodic_train_test_Adv2D(L_x,L_y,M_x,M_y,t_span,alp,number_se
     opnn_train_ic = reshape(hcat(train_ic...),(number_sensors,Int(number_solution_points*number_train_functions)));
     opnn_train_loc = reshape(hcat(train_loc...),(3,Int(number_solution_points*number_train_functions)));
     opnn_train_target = reshape(hcat(train_target...),(1,Int(number_solution_points*number_train_functions)));
+    
     opnn_test_ic = reshape(hcat(test_ic...),(number_sensors,Int(number_solution_points*number_test_functions)));
     opnn_test_loc = reshape(hcat(test_loc...),(3,Int(number_solution_points*number_test_functions)));
     opnn_test_target = reshape(hcat(test_target...),(1,Int(number_solution_points*number_test_functions)));
