@@ -238,7 +238,7 @@ Generate the training and testing data for 2D advection with periodic boundary c
 
 """
 
-function generate_periodic_train_test_Adv2D(L_x,L_y,M_x,M_y,t_span,alp,number_sensors_x,number_sensors_y,number_train_functions,number_test_functions,number_solution_points;batch=number_solution_points,dt_size=1e-3)
+function generate_periodic_train_test_Adv2D(L_x,L_y,M_x,M_y,t_span,alp,number_sensors_x,number_sensors_y,number_train_functions,number_test_functions,number_solution_points;batch=1,dt_size=1e-3)
 
     number_sensors = Int(number_sensors_x*number_sensors_y);
 
@@ -246,13 +246,13 @@ function generate_periodic_train_test_Adv2D(L_x,L_y,M_x,M_y,t_span,alp,number_se
     t_length = Int(t_span[2]/dt_size + 1);
     t_values = range(t_span[1],stop = t_span[2], length = t_length);
     
-    train_ic = zeros(number_sensors,number_solution_points,number_train_functions);
+    train_ic = zeros(number_sensors,number_train_functions);
     train_loc = zeros(3,number_solution_points,number_train_functions);
-    train_target = zeros(1,number_solution_points,number_train_functions);
+    train_target = zeros(number_solution_points,number_train_functions);
     
-    test_ic = zeros(number_sensors,number_solution_points,number_test_functions);
+    test_ic = zeros(number_sensors,number_test_functions);
     test_loc = zeros(3,number_solution_points,number_test_functions);
-    test_target = zeros(1,number_solution_points,number_test_functions);
+    test_target = zeros(number_solution_points,number_test_functions);
 
     
     dL_x = abs(L_x[2]-L_x[1]);
@@ -304,32 +304,27 @@ function generate_periodic_train_test_Adv2D(L_x,L_y,M_x,M_y,t_span,alp,number_se
 	end  
 
 	if l <= number_train_functions
-		for jj = 1:number_solution_points
-			train_ic[:,jj,l] = u0vals; 
-		end
-
+		
+		train_ic[:,l] = u0vals; 
    		train_loc[:,:,l] = sol_location'; 
-   		train_target[:,:,l] = sol_vals';
+   		train_target[:,l] = sol_vals;
 
 	else
-		for jj = 1:number_solution_points
-			test_ic[:,jj,l-number_train_functions] = u0vals; 
-		end
-
+		test_ic[:,l-number_train_functions] = u0vals; 
    		test_loc[:,:,l-number_train_functions] = sol_location'; 
-   		test_target[:,:,l-number_train_functions] = sol_vals';
+   		test_target[:,l-number_train_functions] = sol_vals;
 	end
     end
 
  
     # Combine data sets from each function
-    opnn_train_ic = reshape(hcat(train_ic...),(number_sensors,Int(number_solution_points*number_train_functions)));
-    opnn_train_loc = reshape(hcat(train_loc...),(3,Int(number_solution_points*number_train_functions)));
-    opnn_train_target = reshape(hcat(train_target...),(1,Int(number_solution_points*number_train_functions)));
+    opnn_train_ic = train_ic;
+    opnn_train_loc = train_loc; #reshape(hcat(train_loc...),(3,Int(number_solution_points*number_train_functions)));
+    opnn_train_target = train_target; #reshape(hcat(train_target...),(1,Int(number_solution_points*number_train_functions)));
     
-    opnn_test_ic = reshape(hcat(test_ic...),(number_sensors,Int(number_solution_points*number_test_functions)));
-    opnn_test_loc = reshape(hcat(test_loc...),(3,Int(number_solution_points*number_test_functions)));
-    opnn_test_target = reshape(hcat(test_target...),(1,Int(number_solution_points*number_test_functions)));
+    opnn_test_ic = test_ic;
+    opnn_test_loc = test_loc; #reshape(hcat(test_loc...),(3,Int(number_solution_points*number_test_functions)));
+    opnn_test_target = test_target; #reshape(hcat(test_target...),(1,Int(number_solution_points*number_test_functions)));
 
     train_data = DataLoader(opnn_train_ic, opnn_train_loc, opnn_train_target, batchsize=batch);
     test_data = DataLoader(opnn_test_ic, opnn_test_loc, opnn_test_target, batchsize=batch);
@@ -337,6 +332,60 @@ function generate_periodic_train_test_Adv2D(L_x,L_y,M_x,M_y,t_span,alp,number_se
     return train_data, test_data
 
 
+end
+
+"""
+    train_model_2D(branch,trunk,n_epoch,train_data,test_data,pde_function;learning_rate=1e-5,save_at=2500,starting_epoch=0)
+Train the operator neural network using the mean squared error (MSE) and Adam optimization for `n_epochs` epochs.
+"""
+function train_model_2D(branch,trunk,n_epoch,train_data,test_data,pde_function;learning_rate=1e-5,save_at=250,starting_epoch=0)
+    
+    num_sen = size(train_data.data[1])[1];
+    num_sol = size(train_data.data[2])[2];		    
+ 
+    loss(x,y,z,branch,trunk) = Flux.mse(trunk(y)'*branch(x),z)
+    par = Flux.params(branch,trunk);
+    opt = ADAM(learning_rate);
+    @showprogress 1 "Training the model..." for i in 1:n_epoch
+
+    for (x,y,z) in train_data
+
+        Flux.train!((x,y,z) -> loss(x,y,z,branch,trunk),par,[(reshape(x,num_sen,1),reshape(y,3,num_sol),reshape(z,num_sol,1))],opt);
+    end
+
+    if i%save_at == 0
+            save_model(branch,trunk,Int(starting_epoch+i),(pde_function*"_temp"))
+            train_MSE = loss_all_2D(branch,trunk,train_data);
+            test_MSE = loss_all_2D(branch,trunk,test_data);
+            println("Train MSE $train_MSE")
+            println("Test MSE $test_MSE")
+    end
+    
+    end
+    return branch,trunk
+end
+
+
+"""
+    loss_all_2D(branch,trunk,data_ex)
+Compute the mean squared error (MSE) for a complete dataset.
+"""
+function loss_all_2D(branch,trunk,data_ex)
+
+    num_sen,num_ic = size(data_ex.data[1])[1:2];
+    num_sol = size(data_ex.data[2])[2];			
+
+    Errs = zeros(1,num_ic);
+    num_samples = Int(num_sol*num_ic);
+    
+    let ii = 0   
+   	for (x,y,z) in data_ex
+		ii += 1;
+		Errs[ii] = sum((trunk(reshape(y,3,num_sol))'*branch(reshape(x,num_sen,1)) - reshape(z,num_sol,1)).^2);
+	end
+    end
+    
+    return (1/num_samples)*sum(Errs);
 end
 
 
