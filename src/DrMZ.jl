@@ -19,6 +19,8 @@ using Statistics: mean, std
 using FastGaussQuadrature
 using ForwardDiff
 using LegendrePolynomials
+using Kronecker
+
 
 # Export the functions for General.jl
 export error_se, error_rel, mse_error, norm_rel_error, norm_rel_error_continuous, norm_infinity_error, ic_error, average_ic_error, average_error,
