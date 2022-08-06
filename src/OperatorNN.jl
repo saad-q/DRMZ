@@ -338,7 +338,7 @@ end
     train_model_2D(branch,trunk,n_epoch,train_data,test_data,pde_function;learning_rate=1e-5,save_at=2500,starting_epoch=0)
 Train the operator neural network using the mean squared error (MSE) and Adam optimization for `n_epochs` epochs.
 """
-function train_model_2D(branch,trunk,n_epoch,train_data,test_data,pde_function;learning_rate=1e-5,save_at=2500,starting_epoch=0)
+function train_model_2D(branch,trunk,n_epoch,train_data,test_data,pde_function;learning_rate=1e-5,save_at=25,starting_epoch=0)
     
     bsz = train_data.batchsize;
     num_sen = size(train_data.data[1])[1];
@@ -377,15 +377,20 @@ Compute the mean squared error (MSE) for a complete dataset.
 function loss_all_2D(branch,trunk,data_ex)
 
     num_sen,num_ic = size(data_ex.data[1])[1:2];
-    num_sol = size(data_ex.data[2])[2];			
+    num_sol = size(data_ex.data[2])[2];	
+    bsz = data_ex.batchsize;	
 
-    Errs = zeros(1,num_ic);
+    Msk = kronecker(Matrix(1.0I,bsz,bsz),ones(num_sol,1));
+    Coll = kronecker(ones(1,bsz),Matrix(1.0I,num_sol,num_sol)); 
+
+
+    Errs = zeros(1,Int(num_ic/bsz));
     num_samples = Int(num_sol*num_ic);
     
     let ii = 0   
    	for (x,y,z) in data_ex
 		ii += 1;
-		Errs[ii] = sum((trunk(reshape(y,3,num_sol))'*branch(reshape(x,num_sen,1)) - reshape(z,num_sol,1)).^2);
+		Errs[ii] = sum((Coll*(Msk.*(trunk(reshape(y,3,num_sol*bsz))'*branch(reshape(x,num_sen,bsz)))) - reshape(z,num_sol,bsz)).^2);
 	end
     end
     
