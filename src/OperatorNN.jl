@@ -232,13 +232,13 @@ end
 
 
 """
-    generate_periodic_train_test_Adv2D(L_x,L_y,M_x,M_y,t_span,alp,number_sensors_x,number_sensors_y,number_test_functions,number_train_functions,number_solution_points;batch=number_solution_points,dt=1e-3)
+    generate_periodic_train_test_Adv2D(L_x,L_y,M_x,M_y,t_span,alp,number_sensors_x,number_sensors_y,number_test_functions,number_train_functions,number_solution_points,batch;dt=1e-3)
 
 Generate the training and testing data for 2D advection with periodic boundary conditions
 
 """
 
-function generate_periodic_train_test_Adv2D(L_x,L_y,M_x,M_y,t_span,alp,number_sensors_x,number_sensors_y,number_train_functions,number_test_functions,number_solution_points;batch=1,dt_size=1e-3)
+function generate_periodic_train_test_Adv2D(L_x,L_y,M_x,M_y,t_span,alp,number_sensors_x,number_sensors_y,number_train_functions,number_test_functions,number_solution_points,batch;dt_size=1e-3)
 
     number_sensors = Int(number_sensors_x*number_sensors_y);
 
@@ -340,17 +340,21 @@ Train the operator neural network using the mean squared error (MSE) and Adam op
 """
 function train_model_2D(branch,trunk,n_epoch,train_data,test_data,pde_function;learning_rate=1e-5,save_at=2500,starting_epoch=0)
     
+    bsz = train_data.batchsize;
     num_sen = size(train_data.data[1])[1];
     num_sol = size(train_data.data[2])[2];		    
- 
-    loss(x,y,z,branch,trunk) = Flux.mse(trunk(y)'*branch(x),z)
+    
+    Msk = kronecker(Matrix(1.0I,bsz,bsz),ones(num_sol,1));
+    Coll = kronecker(ones(1,bsz),Matrix(1.0I,num_sol,num_sol)); 
+
+    loss(x,y,z,branch,trunk) = Flux.mse(Coll*(Msk.*(trunk(y)'*branch(x))),z)
     par = Flux.params(branch,trunk);
     opt = ADAM(learning_rate);
     @showprogress 1 "Training the model..." for i in 1:n_epoch
 
     for (x,y,z) in train_data
 
-        Flux.train!((x,y,z) -> loss(x,y,z,branch,trunk),par,[(reshape(x,num_sen,1),reshape(y,3,num_sol),reshape(z,num_sol,1))],opt);
+        Flux.train!((x,y,z) -> loss(x,y,z,branch,trunk),par,[(reshape(x,num_sen,bsz),reshape(y,3,num_sol*bsz),reshape(z,num_sol,bsz))],opt);
     end
 
     if i%save_at == 0
