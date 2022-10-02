@@ -44,7 +44,7 @@ end
     train_model(branch,trunk,n_epoch,train_data;learning_rate=0.00001,save_at=2500,starting_epoch=0)
 Train the operator neural network using the mean squared error (MSE) and Adam optimization for `n_epochs` epochs.
 """
-function train_model(branch,trunk,n_epoch,train_data,test_data,pde_function;learning_rate=1e-4,save_at=2500,starting_epoch=0)
+function train_model(branch,trunk,n_epoch,train_data,test_data,pde_function;learning_rate=1e-5,save_at=2500,starting_epoch=0)
     loss(x,y,z) = Flux.mse(branch(x)'*trunk(y),z)
     par = Flux.params(branch,trunk);
     opt = ADAM(learning_rate);
@@ -338,7 +338,7 @@ end
     train_model_2D(branch,trunk,n_epoch,train_data,test_data,pde_function;learning_rate=1e-5,save_at=2500,starting_epoch=0)
 Train the operator neural network using the mean squared error (MSE) and Adam optimization for `n_epochs` epochs.
 """
-function train_model_2D(branch,trunk,n_epoch,train_data,test_data,pde_function;learning_rate=1e-5,save_at=2500,starting_epoch=0)
+function train_model_2D(branch,trunk,n_epoch,train_data,test_data,pde_function,learning_rate;save_at=2500,starting_epoch=0)
     
     bsz = train_data.batchsize;
     num_sen = size(train_data.data[1])[1];
