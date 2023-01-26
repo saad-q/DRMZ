@@ -230,6 +230,112 @@ function generate_periodic_train_test(L1,L2,t_span,number_sensors,number_train_f
     return train_data, test_data
 end
 
+"""
+    generate_periodic_train_test_Adv2D(L_x,L_y,M_x,M_y,t_span,alp,number_sensors_x,number_sensors_y,number_test_functions,number_train_functions,number_solution_points,batch;dt=1e-3)
+
+Generate the training and testing data for 2D advection with periodic boundary conditions
+
+"""
+
+function generate_periodic_train_test_Diff2D(L_x,L_y,M_x,M_y,t_span,nu,number_sensors_x,number_sensors_y,number_train_functions,number_test_functions,number_solution_points,batch;dt_size=1e-3)
+
+    number_sensors = Int(number_sensors_x*number_sensors_y);
+
+    # Generate the dataset using exact solution to the advection problem
+    t_length = Int(t_span[2]/dt_size + 1);
+    t_values = range(t_span[1],stop = t_span[2], length = t_length);
+    
+    train_ic = zeros(number_sensors,number_train_functions);
+    train_loc = zeros(3,number_solution_points,number_train_functions);
+    train_target = zeros(number_solution_points,number_train_functions);
+    
+    test_ic = zeros(number_sensors,number_test_functions);
+    test_loc = zeros(3,number_solution_points,number_test_functions);
+    test_target = zeros(number_solution_points,number_test_functions);
+
+    
+    dL_x = abs(L_x[2]-L_x[1]);
+    if abs(dL_x) < 1.0e-12
+	dL_x = 1.0;
+    end
+
+    dL_y = abs(L_y[2]-L_y[1]);
+    if abs(dL_y) < 1.0e-12
+	dL_y = 1.0;
+    end
+
+    x_eq = range(L_x[1],stop = L_x[2],length = number_sensors_x + 1); x_eq = x_eq[1:end-1];
+    y_eq = range(L_y[1],stop = L_y[2],length = number_sensors_y + 1); y_eq = y_eq[1:end-1];
+
+    xy_eq = zeros(number_sensors,2);
+    for j = 1:number_sensors_x 
+	xy_eq[(j-1)*number_sensors_y+1:j*number_sensors_y,:] = hcat(repeat([x_eq[j]],number_sensors_y,1),y_eq);
+    end
+
+    t_x_grid = zeros(number_sensors*t_length,3);
+    for i = 1:t_length
+	t_x_grid[(i-1)*number_sensors+1:i*number_sensors,:] = hcat(repeat([t_values[i]],number_sensors,1), xy_eq);
+    end
+
+	
+    @showprogress 1 "Building training and testing datasets..." for l = 1:(number_train_functions + number_test_functions)
+    	
+	C_x = 2*rand(2*M_x+1,1) .- 1;
+	C_y = 2*rand(2*M_y+1,1) .- 1;
+
+	u0x(x) = C_x[1] .+ sum(cos.(2*pi*(x-L_x[1]).*(1:M_x)'/dL_x).*C_x[2:M_x+1]') .+ sum(sin.(2*pi*(x-L_x[1]).*(1:M_x)'/dL_x).*C_x[M_x+2:2*M_x+1]');
+	u0y(y) = C_y[1] .+ sum(cos.(2*pi*(y-L_y[1]).*(1:M_y)'/dL_y).*C_y[2:M_y+1]') .+ sum(sin.(2*pi*(y-L_y[1]).*(1:M_y)'/dL_y).*C_y[M_y+2:2*M_y+1]');
+
+	ux(txy) =  C_x[1] .+ sum(cos.(2*pi*(txy[2]-L_x[1]).*(1:M_x)'/dL_x).*C_x[2:M_x+1]'.*exp.(-nu[1]*txy[1]*(2*pi*(1:M_x)'/dL_x).^2)) .+ sum(sin.(2*pi*(txy[2]-L_x[1]).*(1:M_x)'/dL_x).*C_x[M_x+2:2*M_x+1]'.*exp.(-nu[1]*txy[1]*(2*pi*(1:M_x)'/dL_x).^2));
+	uy(txy) =  C_y[1] .+ sum(cos.(2*pi*(txy[3]-L_y[1]).*(1:M_y)'/dL_y).*C_y[2:M_y+1]'.*exp.(-nu[2]*txy[1]*(2*pi*(1:M_y)'/dL_y).^2)) .+ sum(sin.(2*pi*(txy[3]-L_y[1]).*(1:M_y)'/dL_y).*C_y[M_y+2:2*M_y+1]'.*exp.(-nu[2]*txy[1]*(2*pi*(1:M_y)'/dL_y).^2));
+
+	u0(x,y) = u0x.(x).*u0y.(y);
+	u(txy) = ux(txy)*uy(txy);
+	
+	u0vals = u0(xy_eq[:,1],xy_eq[:,2]);
+
+	
+	shuffled_indices = randperm(number_sensors*t_length);
+	indices = shuffled_indices[1:number_solution_points];
+	# print("halooo\n")
+
+	sol_location = t_x_grid[indices,:];
+        sol_vals = zeros(number_solution_points,1);
+	for jj = 1:number_solution_points
+		sol_vals[jj] = u(sol_location[jj,:]);
+	end  
+
+	if l <= number_train_functions
+		
+		train_ic[:,l] = u0vals; 
+   		train_loc[:,:,l] = sol_location'; 
+   		train_target[:,l] = sol_vals;
+
+	else
+		test_ic[:,l-number_train_functions] = u0vals; 
+   		test_loc[:,:,l-number_train_functions] = sol_location'; 
+   		test_target[:,l-number_train_functions] = sol_vals;
+	end
+    end
+
+ 
+    # Combine data sets from each function
+    opnn_train_ic = train_ic;
+    opnn_train_loc = train_loc; #reshape(hcat(train_loc...),(3,Int(number_solution_points*number_train_functions)));
+    opnn_train_target = train_target; #reshape(hcat(train_target...),(1,Int(number_solution_points*number_train_functions)));
+    
+    opnn_test_ic = test_ic;
+    opnn_test_loc = test_loc; #reshape(hcat(test_loc...),(3,Int(number_solution_points*number_test_functions)));
+    opnn_test_target = test_target; #reshape(hcat(test_target...),(1,Int(number_solution_points*number_test_functions)));
+
+    train_data = DataLoader(opnn_train_ic, opnn_train_loc, opnn_train_target, batchsize=batch);
+    test_data = DataLoader(opnn_test_ic, opnn_test_loc, opnn_test_target, batchsize=batch);
+
+    return train_data, test_data
+
+
+end
+
 
 """
     generate_periodic_train_test_Adv2D(L_x,L_y,M_x,M_y,t_span,alp,number_sensors_x,number_sensors_y,number_test_functions,number_train_functions,number_solution_points,batch;dt=1e-3)
@@ -288,7 +394,7 @@ function generate_periodic_train_test_Adv2D(L_x,L_y,M_x,M_y,t_span,alp,number_se
 	u0y(y) = C_y[1] .+ sum(cos.(2*pi*(y-L_y[1]).*(1:M_y)'/dL_y).*C_y[2:M_y+1]') .+ sum(sin.(2*pi*(y-L_y[1]).*(1:M_y)'/dL_y).*C_y[M_y+2:2*M_y+1]');
 
 	u0(x,y) = u0x.(x).*u0y.(y);
-	u(txy) = u0x.(mod.(txy[2]-alp[1]*txy[1]+L_x[1],dL_x) .+ L_x[1]).*u0y.(mod.(txy[3]-alp[2]*txy[1]+L_y[1],dL_y) .+ L_y[1]);
+	u(txy) = u0x.(mod.(txy[2]-alp[1]*txy[1]-L_x[1],dL_x) .+ L_x[1]).*u0y.(mod.(txy[3]-alp[2]*txy[1]-L_y[1],dL_y) .+ L_y[1]);
 	
 	u0vals = u0(xy_eq[:,1],xy_eq[:,2]);
 
@@ -344,8 +450,8 @@ function train_model_2D(branch,trunk,n_epoch,train_data,test_data,pde_function,l
     num_sen = size(train_data.data[1])[1];
     num_sol = size(train_data.data[2])[2];		    
     
-    Msk = kronecker(Matrix(1.0I,bsz,bsz),ones(num_sol,1));
-    Coll = kronecker(ones(1,bsz),Matrix(1.0I,num_sol,num_sol)); 
+    Msk = kronecker(Matrix(1.0I,bsz,bsz),ones(num_sol,1)); # Mask
+    Coll = kronecker(ones(1,bsz),Matrix(1.0I,num_sol,num_sol)); # Collect, collapse
 
     loss(x,y,z,branch,trunk) = Flux.mse(Coll*(Msk.*(trunk(y)'*branch(x))),z)
     par = Flux.params(branch,trunk);
